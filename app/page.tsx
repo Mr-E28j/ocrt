@@ -23,7 +23,34 @@ if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.href;
 }
 
+// Add after your imports
+const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
 export default function Home() {
+  // Add new state for the easter egg
+  const [konamiIndex, setKonamiIndex] = useState(0);
+  const [showEasterEgg, setShowEasterEgg] = useState(false);
+
+  // Add effect for Konami code detection
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === KONAMI_CODE[konamiIndex]) {
+        if (konamiIndex === KONAMI_CODE.length - 1) {
+          setShowEasterEgg(true);
+          setKonamiIndex(0);
+          setTimeout(() => setShowEasterEgg(false), 3000);
+        } else {
+          setKonamiIndex(prev => prev + 1);
+        }
+      } else {
+        setKonamiIndex(0);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [konamiIndex]);
+
   // Add new state for progress
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [text, setText] = useState("")
