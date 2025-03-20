@@ -11,8 +11,16 @@ import { useTheme } from "next-themes"
 // Remove this line: import { pdfjs } from 'react-pdf';
 
 // Add this instead:
+// Update the imports and PDF.js initialization
 import * as pdfjs from 'pdfjs-dist';
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+// Initialize PDF.js worker
+if (typeof window !== 'undefined') {
+  import('pdfjs-dist/build/pdf.worker.mjs' as any).then((pdfjsWorker) => {
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
+  })
+}
 
 export default function Home() {
   // Add new state for progress
