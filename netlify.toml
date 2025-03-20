@@ -1,9 +1,9 @@
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  command = "npm install --legacy-peer-deps && NODE_OPTIONS='--openssl-legacy-provider' npm run build"
   publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NODE_VERSION = "18.20.7"
+  NODE_VERSION = "18.17.0"

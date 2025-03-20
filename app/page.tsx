@@ -16,10 +16,7 @@ import * as pdfjs from 'pdfjs-dist';
 
 // Initialize PDF.js worker
 if (typeof window !== 'undefined') {
-  import('pdfjs-dist/build/pdf.worker.mjs' as any).then((pdfjsWorker) => {
-    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
-  })
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 }
 
 export default function Home() {
