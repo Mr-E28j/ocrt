@@ -6,14 +6,16 @@ import { ArrowRight, Copy, FileText, Image, Upload, Moon, Sun } from "lucide-rea
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { createWorker } from "tesseract.js"  // Remove PSM from import
+import { createWorker } from "tesseract.js"
 import { useTheme } from "next-themes"
-import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjs } from 'react-pdf';
 
-// Initialize PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Initialize PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export default function Home() {
+  // Add new state for progress
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [text, setText] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -31,45 +33,35 @@ export default function Home() {
   // Asegurar que el componente no renderice nada relacionado con el tema hasta que esté montado
   const currentTheme = mounted ? theme : undefined
 
-  const extractPdfText = async (file: File) => {
+  const convertPDFToImages = async (file: File, worker: any) => {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
+    const pdf = await pdfjs.getDocument(arrayBuffer).promise;
+    const totalPages = pdf.numPages;
+    let allText = '';
+    
+    setProgress({ current: 0, total: totalPages });
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      try {
-        // First try to get text content directly
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        
-        if (pageText.trim()) {
-          // If we got text, use it
-          fullText += pageText + '\n';
-        } else {
-          // If no text found (scanned PDF), render and OCR
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-          
-          await page.render({
-            canvasContext: context!,
-            viewport: viewport
-          }).promise;
-
-          const worker = await createWorker();
-          const { data: { text } } = await worker.recognize(canvas);
-          await worker.terminate();
-          fullText += text + '\n';
-        }
-      } catch (error) {
-        console.error(`Error processing page ${i}:`, error);
-      }
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      setProgress(prev => ({ ...prev, current: pageNum }));
+      const canvas = document.createElement('canvas');
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 2.0 });
+      
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({
+        canvasContext: canvas.getContext('2d')!,
+        viewport,
+      }).promise;
+      
+      const imageData = canvas.toDataURL('image/png');
+      const { data: { text } } = await worker.recognize(imageData);
+      allText += text + '\n\n--- Page ' + pageNum + ' ---\n\n';
     }
-    return fullText;
-};
+    
+    return allText;
+  };
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -80,38 +72,39 @@ export default function Home() {
       setIsProcessing(true);
       setText("");
 
+      let worker: any = null;
       try {
-        if (file.type === 'application/pdf') {
-          const text = await extractPdfText(file);
-          setText(text);
-        } else {
-          // Existing image processing code
-          const worker = await createWorker("spa");
+        worker = await createWorker("spa");
+        
+        if (isHandwritten) {
           await worker.setParameters({
-            tessedit_ocr_engine_mode: 3,
+            tessedit_ocr_engine_mode: 2, // Modo optimizado para manuscritos
+            tessedit_pageseg_mode: 6, // Modo de segmentación para texto manuscrito
             preserve_interword_spaces: "1",
-          });
-          if (isHandwritten) {
-            await worker.setParameters({
-              tessedit_ocr_engine_mode: 2,
-              preserve_interword_spaces: "1",
-              textord_heavy_nr: "1",
-              textord_min_linesize: "2.5",
-            });
-          }
+            textord_heavy_nr: "1", // Mejora la detección de líneas en manuscritos
+            textord_min_linesize: "2.5", // Ajuste para líneas de texto manuscrito
+          })
+        }
+
+        if (file.type === 'application/pdf') {
+          const allText = await convertPDFToImages(file, worker);
+          setText(allText);
+        } else {
           const { data: { text } } = await worker.recognize(file);
           setText(text);
-          await worker.terminate();
         }
       } catch (error) {
-        console.error("Error processing file:", error);
-        setText("Error al procesar el archivo. Por favor, inténtalo de nuevo.");
+        console.error("Error processing image:", error)
+        setText("Error al procesar la imagen. Por favor, inténtalo de nuevo.")
       } finally {
-        setIsProcessing(false);
+        setIsProcessing(false)
+        if (worker) {
+          await worker.terminate()
+        }
       }
     },
-    [isHandwritten]
-  );
+    [isHandwritten],
+  )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -221,7 +214,19 @@ export default function Home() {
                   {isProcessing && (
                     <div className="text-center py-4">
                       <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-muted border-r-primary"></div>
-                      <p className="mt-2 text-sm text-muted-foreground">Procesando...</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {progress.total > 0 
+                          ? `Procesando página ${progress.current} de ${progress.total}...`
+                          : "Procesando..."}
+                      </p>
+                      {progress.total > 0 && (
+                        <div className="mt-2 w-full max-w-xs mx-auto bg-muted rounded-full h-1.5">
+                          <div 
+                            className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                            style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </TabsContent>
