@@ -6,8 +6,12 @@ import { ArrowRight, Copy, FileText, Image, Upload, Moon, Sun } from "lucide-rea
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { createWorker } from "tesseract.js"
+import { createWorker } from "tesseract.js"  // Remove PSM from import
 import { useTheme } from "next-themes"
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Initialize PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export default function Home() {
   const [text, setText] = useState("")
@@ -27,47 +31,87 @@ export default function Home() {
   // Asegurar que el componente no renderice nada relacionado con el tema hasta que esté montado
   const currentTheme = mounted ? theme : undefined
 
+  const extractPdfText = async (file: File) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      try {
+        // First try to get text content directly
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        
+        if (pageText.trim()) {
+          // If we got text, use it
+          fullText += pageText + '\n';
+        } else {
+          // If no text found (scanned PDF), render and OCR
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          
+          await page.render({
+            canvasContext: context!,
+            viewport: viewport
+          }).promise;
+
+          const worker = await createWorker();
+          const { data: { text } } = await worker.recognize(canvas);
+          await worker.terminate();
+          fullText += text + '\n';
+        }
+      } catch (error) {
+        console.error(`Error processing page ${i}:`, error);
+      }
+    }
+    return fullText;
+};
+
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return
+      if (acceptedFiles.length === 0) return;
 
-      const file = acceptedFiles[0]
-      setFileType(file.type)
-      setIsProcessing(true)
-      setText("")
-
-      let worker: any = null
+      const file = acceptedFiles[0];
+      setFileType(file.type);
+      setIsProcessing(true);
+      setText("");
 
       try {
-        worker = await createWorker("spa")
-
-        // Configurar opciones específicas para texto manuscrito si está activado
-        if (isHandwritten) {
+        if (file.type === 'application/pdf') {
+          const text = await extractPdfText(file);
+          setText(text);
+        } else {
+          // Existing image processing code
+          const worker = await createWorker("spa");
           await worker.setParameters({
-            tessedit_ocr_engine_mode: 2, // Modo optimizado para manuscritos
-            tessedit_pageseg_mode: 6, // Modo de segmentación para texto manuscrito
+            tessedit_ocr_engine_mode: 3,
             preserve_interword_spaces: "1",
-            textord_heavy_nr: "1", // Mejora la detección de líneas en manuscritos
-            textord_min_linesize: "2.5", // Ajuste para líneas de texto manuscrito
-          })
+          });
+          if (isHandwritten) {
+            await worker.setParameters({
+              tessedit_ocr_engine_mode: 2,
+              preserve_interword_spaces: "1",
+              textord_heavy_nr: "1",
+              textord_min_linesize: "2.5",
+            });
+          }
+          const { data: { text } } = await worker.recognize(file);
+          setText(text);
+          await worker.terminate();
         }
-
-        const {
-          data: { text },
-        } = await worker.recognize(file)
-        setText(text)
       } catch (error) {
-        console.error("Error processing image:", error)
-        setText("Error al procesar la imagen. Por favor, inténtalo de nuevo.")
+        console.error("Error processing file:", error);
+        setText("Error al procesar el archivo. Por favor, inténtalo de nuevo.");
       } finally {
-        setIsProcessing(false)
-        if (worker) {
-          await worker.terminate()
-        }
+        setIsProcessing(false);
       }
     },
-    [isHandwritten],
-  )
+    [isHandwritten]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
