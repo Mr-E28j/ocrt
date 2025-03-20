@@ -10,11 +10,17 @@ import { createWorker } from "tesseract.js"
 import { useTheme } from "next-themes"
 // Remove this line: import { pdfjs } from 'react-pdf';
 
-// Update the PDF.js initialization
+// Add this instead:
+// Update the imports and PDF.js initialization
 import * as pdfjs from 'pdfjs-dist';
 
+// Initialize PDF.js worker
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const workerUrl = new URL(
+    'pdfjs-dist/build/pdf.worker.mjs',
+    import.meta.url
+  );
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl.href;
 }
 
 export default function Home() {
