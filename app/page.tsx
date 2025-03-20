@@ -8,9 +8,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createWorker } from "tesseract.js"
 import { useTheme } from "next-themes"
-import { pdfjs } from 'react-pdf';
+// Remove this line: import { pdfjs } from 'react-pdf';
 
-// Initialize PDF.js worker
+// Add this instead:
+import * as pdfjs from 'pdfjs-dist';
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export default function Home() {
