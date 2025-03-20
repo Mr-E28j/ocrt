@@ -1,9 +1,11 @@
 [build]
-  command = "npm install --legacy-peer-deps && NODE_OPTIONS='--openssl-legacy-provider' npm run build"
+  command = "npm install --legacy-peer-deps && npm run build"
   publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NODE_VERSION = "18.18.0"
+  NODE_VERSION = "20.0.0"
+  NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_SHARP_PATH = "/tmp/node_modules/sharp"
