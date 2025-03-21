@@ -342,6 +342,13 @@ export default function Home() {
           </footer>
         </div>
       )}
+      {showEasterEgg && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="text-6xl animate-bounce">
+            Visita: <a href="https://wadjet.netlify.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">wadjet.netlify.app</a> 👁️
+          </div>
+        </div>
+      )}
     </main>
   )
 }

@@ -8,7 +8,15 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata = {
   title: "OCR Inteligente - Extracción de texto de imágenes y PDFs",
   description: "Herramienta OCR minimalista para extraer texto de imágenes y documentos PDF con precisión y facilidad.",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  icons: {
+    icon: [
+      {
+        url: '/favicon.svg?v=1',
+        type: 'image/svg+xml',
+      },
+    ],
+  },
 }
 
 export default function RootLayout({
@@ -32,7 +40,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-
-import './globals.css'
